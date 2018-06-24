@@ -1,22 +1,15 @@
 #include <cmath>
 #include <cstddef>
-#include <cstdint>
 
 #include <algorithm>
-#include <array>
 #include <fstream>
-#include <limits>
 #include <set>
-#include <utility>
-#include <vector>
 
 #include "preprocess_search.hpp"
 
 namespace PS
 {
-    typedef std::uint_least32_t Index;
     constexpr static const Index INDEX_NULL(std::numeric_limits<Index>::max());
-    typedef double Float;
     constexpr static const Float FLOAT_INFINITY(std::numeric_limits<Float>::infinity());
 
     typedef std::pair<Float, Float> Coordin;
@@ -30,18 +23,6 @@ namespace PS
     typedef std::vector<bool> VisitList;
     typedef std::pair<Float, Index> PathSeg;
     typedef std::set<PathSeg> Queue;
-    typedef std::vector<Index> Path;
-
-    constexpr static const std::size_t FIRST(0u);
-    constexpr static const std::size_t SECOND(1u);
-    constexpr static const std::size_t SIZE(2u);
-
-    typedef std::pair<Float, std::array<Index, SIZE>> ShortestPath;
-    typedef std::array<std::vector<Float>, SIZE> BinDistanceList;
-    typedef std::array<std::vector<Index>, SIZE> BinParentList;
-    typedef std::array<std::vector<bool>, SIZE> BinVisitList;
-    typedef std::array<std::set<PathSeg>, SIZE> BinQueue;
-    typedef std::array<bool, SIZE> Termin;
 
     constexpr static const Float
         DEG_TO_RAD(3.1415926535897932384626l / 180.l),
@@ -59,14 +40,7 @@ namespace PS
     static void search_graph_read(const std::string &, Graph &, Mapp &);
 
     template <bool full_output>
-    static Float bin_a_star(const Graph &, Index, Index, Path &, BinDistanceList &, BinParentList &, BinVisitList &);
-    template <bool full_output>
-    static void search_init(Index, Index, BinDistanceList &, BinParentList &, BinVisitList &);
-    template <bool full_output>
-    static void iteration_cycle(const Graph &, Index, Index, BinDistanceList &, BinParentList &, BinVisitList &, ShortestPath &);
-    template <bool full_output>
-    static void relax(const Graph &, Index, Index, BinDistanceList &, ParentList &, const BinVisitList &, ShortestPath &, Queue &, std::size_t);
-    static void find_path(Path &, const BinParentList &, const ShortestPath &);
+    static Float a_star(const Graph &, Index, Index, Path &, DistanceList &, ParentList &, VisitList &);
 }
 
 void PS::preprocess(const std::string &nodes, const std::string &edges, const std::string &output)
@@ -93,18 +67,13 @@ void PS::search(const std::string &graph_str, const std::string &input_str, cons
     auto mapp_begin(mapp.cbegin()), mapp_end(mapp.cend());
 
     const std::size_t size(graph.size());
-    BinDistanceList distance_list;
-    distance_list[FIRST].resize(size);
-    distance_list[SECOND].resize(size);
-    BinParentList parent_list;
+    DistanceList distance_list(size);
+    ParentList parent_list;
     if (full_output)
     {
-        parent_list[FIRST].resize(size);
-        parent_list[SECOND].resize(size);
+        parent_list.resize(size);
     }
-    BinVisitList is_black;
-    is_black[FIRST].resize(size);
-    is_black[SECOND].resize(size);
+    VisitList is_black(size);
     Path path;
 
     for (Index start, finish; !input_stream.eof(); )
@@ -117,14 +86,14 @@ void PS::search(const std::string &graph_str, const std::string &input_str, cons
 
         start = std::lower_bound(mapp_begin, mapp_end, start) - mapp_begin;
         finish = std::lower_bound(mapp_begin, mapp_end, finish) - mapp_begin;
-        const Float distance = bin_a_star<full_output>(graph, start, finish, path, distance_list, parent_list, is_black);
+        const Float distance = a_star<full_output>(graph, start, finish, path, distance_list, parent_list, is_black);
         output_stream << distance << '\n';
         if (full_output)
         {
             output_stream << path.size();
-            for (const Index &index : path)
+            for (auto path_it(path.crbegin()), path_end(path.crend()); path_it != path_end; ++path_it)
             {
-                output_stream << ' ' << mapp[index];
+                output_stream << ' ' << mapp[*path_it];
             }
             output_stream << '\n';
         }
@@ -225,7 +194,7 @@ static void PS::search_graph_read(const std::string &graph_str, PS::Graph &graph
 }
 
 template <bool full_output>
-static PS::Float PS::bin_a_star(const PS::Graph &graph, PS::Index start, PS::Index finish, PS::Path &path, PS::BinDistanceList &distance_list, PS::BinParentList &parent_list, PS::BinVisitList &is_black)
+static PS::Float PS::a_star(const PS::Graph &graph, PS::Index start, PS::Index finish, PS::Path &path, DistanceList &distance_list, ParentList &parent_list, VisitList &is_black)
 {
     if (full_output)
     {
@@ -236,135 +205,67 @@ static PS::Float PS::bin_a_star(const PS::Graph &graph, PS::Index start, PS::Ind
         return 0.l;
     }
 
-    search_init<full_output>(start, finish, distance_list, parent_list, is_black);
-    ShortestPath mu;
-    iteration_cycle<full_output>(graph, start, finish, distance_list, parent_list, is_black, mu);
-    if (std::isinf(mu.first))
-    {
-        return -1.l;
-    }
-
+    std::fill(distance_list.begin(), distance_list.end(), FLOAT_INFINITY);
+    distance_list[start] = 0.l;
     if (full_output)
     {
-        find_path(path, parent_list, mu);
+        parent_list[start] = INDEX_NULL;
     }
+    std::fill(is_black.begin(), is_black.end(), false);
 
-    return mu.first;
-}
-
-template <bool full_output>
-static inline void PS::search_init(PS::Index start, PS::Index finish, PS::BinDistanceList &distance_list, PS::BinParentList &parent_list, PS::BinVisitList &is_black)
-{
-    std::fill(distance_list[FIRST].begin(), distance_list[FIRST].end(), FLOAT_INFINITY);
-    std::fill(distance_list[SECOND].begin(), distance_list[SECOND].end(), FLOAT_INFINITY);
-    distance_list[FIRST][start] = 0.l;
-    distance_list[SECOND][finish] = 0.l;
-    if (full_output)
-    {
-        parent_list[FIRST][start] = INDEX_NULL;
-        parent_list[SECOND][finish] = INDEX_NULL;
-    }
-    std::fill(is_black[FIRST].begin(), is_black[FIRST].end(), false);
-    std::fill(is_black[SECOND].begin(), is_black[SECOND].end(), false);
-}
-
-template <bool full_output>
-static void PS::iteration_cycle(const PS::Graph &graph, PS::Index start, PS::Index finish, PS::BinDistanceList &distance_list, PS::BinParentList &parent_list, PS::BinVisitList &is_black, PS::ShortestPath &mu)
-{
-    mu.first = FLOAT_INFINITY;
-    BinQueue queue;
-    queue[FIRST].emplace(0.l, start);
-    queue[SECOND].emplace(0.l, finish);
+    Queue queue;
+    queue.emplace(0.l, start);
 
     Queue::const_iterator it;
-    std::size_t turn = FIRST, new_turn(1u);
-    Termin termin;
+    PathSeg path_seg;
     do
     {
-        it = queue[turn].begin();
-        const std::size_t another(turn ^ 1u);
-        if (mu.first <= it->first)
-        {
-            termin[turn] = true;
-            if (termin[another])
-            {
-                break;
-            }
-            turn = another;
-            new_turn = 0u;
-            continue;
-        }
+        it = queue.begin();
         const Index vertex(it->second);
-        is_black[turn][vertex] = true;
-        queue[turn].erase(it);
-        Index dest(turn ? start : finish);
-        relax<full_output>(graph, vertex, dest, distance_list, parent_list[turn], is_black, mu, queue[turn], turn);
-        turn ^= new_turn;
-    } while (!queue[FIRST].empty() && !queue[SECOND].empty());
-}
-
-template <bool full_output>
-static void PS::relax(const PS::Graph &graph, PS::Index vertex, PS::Index dest, PS::BinDistanceList &distance_list, PS::ParentList &parent_list, const PS::BinVisitList &is_black, PS::ShortestPath &mu, PS::Queue &queue, std::size_t turn)
-{
-    PathSeg path_seg;
-    const std::size_t another(turn ^ 1u);
-    const Float distance(distance_list[turn][vertex]);
-    for (const Index &index : graph[vertex].second)
-    {
-        if (is_black[turn][index])
+        if (vertex == finish)
         {
-            continue;
-        }
-        const Float
-            edge_weight(great_circle_distance(graph[vertex].first, graph[index].first)),
-            heuristic(great_circle_distance(graph[index].first, graph[dest].first));
-        const Float path_length(distance + edge_weight);
-        if (path_length < distance_list[turn][index])
-        {
-            path_seg.second = index;
-            if (!std::isinf(distance_list[turn][index]))
-            {
-                path_seg.first = distance_list[turn][index] + heuristic;
-                queue.erase(path_seg);
-            }
-            distance_list[turn][index] = path_length;
             if (full_output)
             {
-                parent_list[index] = vertex;
-            }
-            path_seg.first = path_length + heuristic;
-            queue.insert(path_seg);
-            if (is_black[another][index])
-            {
-                const Float full_distance(path_length + distance_list[another][index]);
-                if (full_distance < mu.first)
+                for (Index curr(finish); curr != INDEX_NULL; curr = parent_list[curr])
                 {
-                    mu.first = full_distance;
-                    mu.second[FIRST] = vertex;
-                    mu.second[SECOND] = index;
-                    if (turn)
-                    {
-                        std::swap(mu.second[FIRST], mu.second[SECOND]);
-                    }
+                    path.push_back(curr);
                 }
             }
+            return distance_list[finish];
         }
-    }
-}
+        is_black[vertex] = true;
+        queue.erase(it);
+        const Float distance(distance_list[vertex]);
+        for (const Index &index : graph[vertex].second)
+        {
+            if (is_black[index])
+            {
+                continue;
+            }
+            const Float
+                edge_weight(great_circle_distance(graph[vertex].first, graph[index].first)),
+                heuristic(great_circle_distance(graph[index].first, graph[finish].first));
+            const Float path_length(distance + edge_weight);
+            if (path_length < distance_list[index])
+            {
+                path_seg.second = index;
+                if (!std::isinf(distance_list[index]))
+                {
+                    path_seg.first = distance_list[index] + heuristic;
+                    queue.erase(path_seg);
+                }
+                distance_list[index] = path_length;
+                if (full_output)
+                {
+                    parent_list[index] = vertex;
+                }
+                path_seg.first = path_length + heuristic;
+                queue.insert(path_seg);
+            }
+        }
+    } while (!queue.empty());
 
-static inline void PS::find_path(PS::Path &path, const PS::BinParentList &parent_list, const PS::ShortestPath &mu)
-{
-    for (std::size_t turn(FIRST); turn < SIZE; ++turn)
-    {
-        for (Index curr(mu.second[turn]); curr != INDEX_NULL; curr = parent_list[turn][curr])
-        {
-            path.push_back(curr);
-        }
-        if (turn == FIRST)
-        {
-            std::reverse(path.begin(), path.end());
-        }
-    }
+    return -1.l;
 }
 
 constexpr static inline PS::Float PS::deg_to_rad(PS::Float deg)
@@ -386,22 +287,10 @@ constexpr static inline PS::Float PS::great_circle_distance(const PS::Coordin &p
 }
 
 template
+static PS::Float PS::a_star<false>(const PS::Graph &, PS::Index, PS::Index, PS::Path &, DistanceList &, ParentList &, VisitList &);
+template
+static PS::Float PS::a_star<true>(const PS::Graph &, PS::Index, PS::Index, PS::Path &, DistanceList &, ParentList &, VisitList &);
+template
 void PS::search<false>(const std::string &, const std::string &, const std::string &);
 template
 void PS::search<true>(const std::string &, const std::string &, const std::string &);
-template
-static PS::Float PS::bin_a_star<false>(const PS::Graph &, PS::Index, PS::Index, PS::Path &, PS::BinDistanceList &, PS::BinParentList &, PS::BinVisitList &);
-template
-static PS::Float PS::bin_a_star<true>(const PS::Graph &, PS::Index, PS::Index, PS::Path &, PS::BinDistanceList &, PS::BinParentList &, PS::BinVisitList &);
-template
-static void PS::search_init<false>(PS::Index, PS::Index, PS::BinDistanceList &, PS::BinParentList &, PS::BinVisitList &);
-template
-static void PS::search_init<true>(PS::Index, PS::Index, PS::BinDistanceList &, PS::BinParentList &, PS::BinVisitList &);
-template
-static void PS::iteration_cycle<false>(const PS::Graph &, PS::Index, PS::Index, PS::BinDistanceList &, PS::BinParentList &, PS::BinVisitList &, PS::ShortestPath &);
-template
-static void PS::iteration_cycle<true>(const PS::Graph &, PS::Index, PS::Index, PS::BinDistanceList &, PS::BinParentList &, PS::BinVisitList &, PS::ShortestPath &);
-template
-static void PS::relax<false>(const PS::Graph &, PS::Index, PS::Index, PS::BinDistanceList &, PS::ParentList &, const PS::BinVisitList &, PS::ShortestPath &, PS::Queue &, std::size_t);
-template
-static void PS::relax<true>(const PS::Graph &, PS::Index, PS::Index, PS::BinDistanceList &, PS::ParentList &, const PS::BinVisitList &, PS::ShortestPath &, PS::Queue &, std::size_t);
