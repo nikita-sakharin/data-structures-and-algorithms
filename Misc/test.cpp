@@ -2,8 +2,8 @@
 #include <functional>
 #include <vector>
 
-typedef unsigned char schar;
-typedef signed char uchar;
+typedef signed char schar;
+typedef unsigned char uchar;
 typedef short shrt;
 typedef unsigned short ushrt;
 typedef unsigned uint;
