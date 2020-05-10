@@ -89,7 +89,7 @@ pair<vector<dbl>, vector<llong>> dijkstra(
         const ullong u = q.begin()->second;
         q.erase(q.begin());
 
-        for (const pair<ullong, llong> &u_v : g[u])
+        for (const pair<ullong, dbl> &u_v : g[u])
         {
             relax(u, u_v, q, d, pi);
         }
