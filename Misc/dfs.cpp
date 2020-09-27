@@ -58,7 +58,7 @@ enum : uint
 
 tuple<vector<llong>, vector<llong>, vector<llong>>
     dfs(const vector<vector<ullong>> &);
-void dfs_visit(const vector<vector<ullong>> &, vector<int> &, vector<llong> &,
+void dfs_visit(const vector<vector<ullong>> &, vector<uint> &, vector<llong> &,
     vector<llong> &, vector<llong> &, llong &, llong) noexcept;
 
 int main()
@@ -89,7 +89,7 @@ tuple<vector<llong>, vector<llong>, vector<llong>>
     dfs(const vector<vector<ullong>> &g)
 {
     const ullong n = g.size();
-    vector<int> color(n, WHITE);
+    vector<uint> color(n, WHITE);
     vector<llong> d(n, MAX_LLONG), f(n, MAX_LLONG), pi(n, -1);
     llong dfs_time = 0;
 
@@ -100,7 +100,7 @@ tuple<vector<llong>, vector<llong>, vector<llong>>
     return make_tuple(d, f, pi);
 }
 
-void dfs_visit(const vector<vector<ullong>> &g, vector<int> &color,
+void dfs_visit(const vector<vector<ullong>> &g, vector<uint> &color,
     vector<llong> &d, vector<llong> &f, vector<llong> &pi, llong &dfs_time,
     const llong u) noexcept
 {
