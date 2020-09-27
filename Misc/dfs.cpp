@@ -49,7 +49,7 @@ using criter = typename T::const_reverse_iterator;
 
 static constexpr llong MAX_LLONG = numeric_limits<llong>::max();
 
-enum Color : int
+enum : uint
 {
     WHITE,
     GRAY,
@@ -94,14 +94,10 @@ tuple<vector<llong>, vector<llong>, vector<llong>>
     llong dfs_time = 0;
 
     for (ullong u = 0; u < n; ++u)
-    {
         if (color[u] == WHITE)
-        {
             dfs_visit(g, color, d, f, pi, dfs_time, u);
-        }
-    }
 
-    return tuple<vector<llong>, vector<llong>, vector<llong>>(d, f, pi);
+    return make_tuple(d, f, pi);
 }
 
 void dfs_visit(const vector<vector<ullong>> &g, vector<int> &color,
@@ -112,13 +108,11 @@ void dfs_visit(const vector<vector<ullong>> &g, vector<int> &color,
     color[u] = GRAY;
 
     for (const ullong &v : g[u])
-    {
         if (color[v] == WHITE)
         {
             pi[v] = u;
             dfs_visit(g, color, d, f, pi, dfs_time, v);
         }
-    }
 
     color[u] = BLACK;
     f[u] = dfs_time++;
