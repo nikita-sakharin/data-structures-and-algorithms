@@ -1,5 +1,5 @@
 #include <cstddef>
-#include <fstream>
+#include <string>
 
 #include "preprocess_search.hpp"
 
