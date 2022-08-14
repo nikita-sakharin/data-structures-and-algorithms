@@ -1,16 +1,20 @@
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 
 #include <algorithm>
 #include <fstream>
+#include <limits>
 #include <set>
+#include <utility>
+#include <vector>
 
 #include "preprocess_search.hpp"
 
 namespace PS
 {
-    constexpr static const Index INDEX_NULL(std::numeric_limits<Index>::max());
-    constexpr static const Float FLOAT_INFINITY(std::numeric_limits<Float>::infinity());
+    typedef std::uint_least32_t Index;
+    typedef double Float;
 
     typedef std::pair<Float, Float> Coordin;
     typedef std::vector<Index> Edges;
@@ -23,6 +27,10 @@ namespace PS
     typedef std::vector<bool> VisitList;
     typedef std::pair<Float, Index> PathSeg;
     typedef std::set<PathSeg> Queue;
+    typedef std::vector<Index> Path;
+
+    constexpr static const Index INDEX_NULL(std::numeric_limits<Index>::max());
+    constexpr static const Float FLOAT_INFINITY(std::numeric_limits<Float>::infinity());
 
     constexpr static const Float
         DEG_TO_RAD(3.1415926535897932384626l / 180.l),
@@ -98,9 +106,6 @@ void PS::search(const std::string &graph_str, const std::string &input_str, cons
             output_stream << '\n';
         }
     }
-
-    input_stream.close();
-    output_stream.close();
 }
 
 static void PS::preprocess_nodes(const std::string &nodes, PS::Graph &graph, PS::Mapp &mapp)
@@ -121,7 +126,6 @@ static void PS::preprocess_nodes(const std::string &nodes, PS::Graph &graph, PS:
         mapp.push_back(index);
         graph.emplace_back(coordin, Edges());
     }
-    nodes_stream.close();
 }
 
 static void PS::preprocess_edges(const std::string &edges, PS::Graph &graph, const PS::Mapp &mapp)
@@ -154,7 +158,6 @@ static void PS::preprocess_edges(const std::string &edges, PS::Graph &graph, con
             index1 = index2;
         }
     }
-    edges_stream.close();
 }
 
 static void PS::preprocess_output(const std::string &output, const PS::Graph &graph, const PS::Mapp &mapp)
@@ -171,7 +174,6 @@ static void PS::preprocess_output(const std::string &output, const PS::Graph &gr
         output_stream.write(reinterpret_cast<const char *>(&size), sizeof(Index));
         output_stream.write(reinterpret_cast<const char *>(vertex.second.data()), sizeof(Index) * static_cast<std::size_t>(size));
     }
-    output_stream.close();
 }
 
 static void PS::search_graph_read(const std::string &graph_str, PS::Graph &graph, PS::Mapp &mapp)
@@ -190,7 +192,6 @@ static void PS::search_graph_read(const std::string &graph_str, PS::Graph &graph
         vertex.second.resize(size);
         graph_stream.read(reinterpret_cast<char *>(vertex.second.data()), sizeof(Index) * static_cast<std::size_t>(size));
     }
-    graph_stream.close();
 }
 
 template <bool full_output>
